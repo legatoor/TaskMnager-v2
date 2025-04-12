@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if form.instance.id %}Редактировать Задачу{% else %}Новая Задача{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        {% if form.instance.id %}Редактировать Задачу{% else %}Создать Новую Задачу{% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="taskForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.title.id_for_label }}" class="form-label">Название Задачи</label>
+                            {{ form.title.errors }}
+                            <input type="text" name="{{ form.title.name }}" id="{{ form.title.id_for_label }}" 
+                                  class="form-control {% if form.title.errors %}is-invalid{% endif %}" 
+                                  value="{{ form.title.value|default:'' }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">Описание</label>
+                            {{ form.description.errors }}
+                            <textarea name="{{ form.description.name }}" id="{{ form.description.id_for_label }}" 
+                                     class="form-control {% if form.description.errors %}is-invalid{% endif %}" 
+                                     rows="3">{{ form.description.value|default:'' }}</textarea>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.status.id_for_label }}" class="form-label">Статус</label>
+                                {{ form.status.errors }}
+                                <select name="{{ form.status.name }}" id="{{ form.status.id_for_label }}" 
+                                      class="form-select {% if form.status.errors %}is-invalid{% endif %}">
+                                    {% for value, text in form.fields.status.choices %}
+                                    <option value="{{ value }}" {% if form.status.value == value %}selected{% endif %}>
+                                        {% if value == 'TODO' %}К выполнению
+                                        {% elif value == 'IN_PROGRESS' %}В процессе
+                                        {% elif value == 'REVIEW' %}На проверке
+                                        {% elif value == 'DONE' %}Выполнено
+                                        {% else %}{{ text }}{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.priority.id_for_label }}" class="form-label">Приоритет</label>
+                                {{ form.priority.errors }}
+                                <select name="{{ form.priority.name }}" id="{{ form.priority.id_for_label }}" 
+                                      class="form-select {% if form.priority.errors %}is-invalid{% endif %}">
+                                    {% for value, text in form.fields.priority.choices %}
+                                    <option value="{{ value }}" {% if form.priority.value == value %}selected{% endif %}>
+                                        {% if value == 1 %}Низкий
+                                        {% elif value == 2 %}Средний
+                                        {% elif value == 3 %}Высокий
+                                        {% elif value == 4 %}Срочно
+                                        {% else %}{{ text }}{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.due_date.id_for_label }}" class="form-label">Срок</label>
+                                {{ form.due_date.errors }}
+                                <input type="datetime-local" name="{{ form.due_date.name }}" id="{{ form.due_date.id_for_label }}" 
+                                      class="form-control {% if form.due_date.errors %}is-invalid{% endif %}" 
+                                      value="{{ form.due_date.value|date:'Y-m-d\TH:i' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.category.id_for_label }}" class="form-label">Категория</label>
+                                {{ form.category.errors }}
+                                <select name="{{ form.category.name }}" id="{{ form.category.id_for_label }}" 
+                                      class="form-select category-select {% if form.category.errors %}is-invalid{% endif %}">
+                                    <option value="">Без Категории</option>
+                                    {% for category in form.fields.category.queryset %}
+                                    <option value="{{ category.id }}" {% if form.category.value == category.id %}selected{% endif %}>
+                                        {{ category.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.assigned_to.id_for_label }}" class="form-label">Назначить</label>
+                                {{ form.assigned_to.errors }}
+                                <select name="{{ form.assigned_to.name }}" id="{{ form.assigned_to.id_for_label }}" 
+                                      class="form-select {% if form.assigned_to.errors %}is-invalid{% endif %}">
+                                    {% for user in form.fields.assigned_to.queryset %}
+                                    <option value="{{ user.id }}" {% if form.assigned_to.value == user.id %}selected{% endif %}>
+                                        {{ user.username }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        
+                            <!-- Simplified observer field - just a regular dropdown -->
+                            <div class="col-md-6">
+                                <label for="{{ form.observer.id_for_label }}" class="form-label">
+                                    <i class="fas fa-eye me-1"></i>Наблюдатель
+                                </label>
+                                {{ form.observer.errors }}
+                                <select name="{{ form.observer.name }}" id="{{ form.observer.id_for_label }}" 
+                                      class="form-select {% if form.observer.errors %}is-invalid{% endif %}">
+                                    {% for choice in form.observer %}
+                                        {{ choice }}
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">
+                                    <small><i class="fas fa-info-circle"></i> {{ form.observer.help_text }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'task-list' %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if form.instance.id %}Обновить Задачу{% else %}Создать Задачу{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add WebSocket support for task creation/updates
+        const taskForm = document.getElementById('taskForm');
+        
+        // After form submit, listen for WebSocket updates
+        // This ensures that after creating/updating a task, any client
+        // will see updates in real-time without page reload
+        
+        {% if is_websocket_enabled %}
+        console.log("WebSocket support enabled for this form");
+        
+        // Listen for task updates via WebSocket after form submission
+        // This will be handled automatically by the signals & consumer setup
+        {% endif %}
+    });
+</script>
+{% endblock %}

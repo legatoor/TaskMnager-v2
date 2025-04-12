@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #log { 
+            height: 300px; 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            overflow: auto;
+            background: #f9f9f9;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Test Tool</h1>
+    
+    <div>
+        <label for="wsUrl">WebSocket URL:</label>
+        <input type="text" id="wsUrl" value="ws://127.0.0.1:8000/ws/echo/" style="width: 300px;">
+        <button id="connect">Connect</button>
+        <button id="disconnect" disabled>Disconnect</button>
+    </div>
+    
+    <div style="margin-top: 10px;">
+        <label for="message">Message:</label>
+        <input type="text" id="message" disabled>
+        <button id="send" disabled>Send</button>
+    </div>
+    
+    <h3>Log:</h3>
+    <div id="log"></div>
+    
+    <script>
+        let socket = null;
+        
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        document.getElementById('connect').addEventListener('click', function() {
+            const url = document.getElementById('wsUrl').value;
+            
+            try {
+                socket = new WebSocket(url);
+                
+                socket.onopen = function(e) {
+                    log(`Connection established to ${url}`, 'success');
+                    document.getElementById('connect').disabled = true;
+                    document.getElementById('disconnect').disabled = false;
+                    document.getElementById('message').disabled = false;
+                    document.getElementById('send').disabled = false;
+                };
+                
+                socket.onmessage = function(e) {
+                    log(`Received: ${e.data}`);
+                };
+                
+                socket.onclose = function(e) {
+                    log(`Connection closed. Code: ${e.code}, Reason: ${e.reason}`, e.wasClean ? 'info' : 'error');
+                    document.getElementById('connect').disabled = false;
+                    document.getElementById('disconnect').disabled = true;
+                    document.getElementById('message').disabled = true;
+                    document.getElementById('send').disabled = true;
+                };
+                
+                socket.onerror = function(e) {
+                    log('WebSocket error occurred', 'error');
+                    console.error(e);
+                };
+            } catch (err) {
+                log(`Error creating WebSocket: ${err.message}`, 'error');
+            }
+        });
+        
+        document.getElementById('disconnect').addEventListener('click', function() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        });
+        
+        document.getElementById('send').addEventListener('click', function() {
+            const message = document.getElementById('message').value;
+            if (socket && message) {
+                socket.send(message);
+                log(`Sent: ${message}`);
+                document.getElementById('message').value = '';
+            }
+        });
+        
+        document.getElementById('message').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('send').click();
+            }
+        });
+    </script>
+</body>
+</html>

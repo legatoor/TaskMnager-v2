@@ -1,0 +1,69 @@
+<header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'home' %}">Менеджер Задач</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{% url 'home' %}">Главная</a>
+                    </li>
+                    {% if user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'dashboard' in request.path %}active{% endif %}" href="{% url 'dashboard' %}">Панель управления</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'tasks' in request.path and 'kanban' not in request.path %}active{% endif %}" href="{% url 'task-list' %}">Задачи</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'kanban' in request.path %}active{% endif %}" href="{% url 'kanban-board' %}">Канбан-доска</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'categories' in request.path %}active{% endif %}" href="{% url 'category-list' %}">Категории</a>
+                    </li>
+                    <!-- Add Employee List link here -->
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'employees' in request.path %}active{% endif %}" href="{% url 'employee-list' %}">
+                            <i class="fas fa-users"></i> Сотрудники
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    {% if user.is_authenticated %}
+                    <!-- Notification icon with badge -->
+                    <li class="nav-item me-2">
+                        <a class="nav-link position-relative {% if 'notifications' in request.path %}active{% endif %}" href="{% url 'notifications' %}">
+                            <i class="fas fa-bell"></i>
+                            {% if unread_notifications_count > 0 %}
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                {{ unread_notifications_count }}
+                                <span class="visually-hidden">непрочитанных уведомлений</span>
+                            </span>
+                            {% endif %}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'profile' in request.path %}active{% endif %}" href="{% url 'profile' %}">Профиль</a>
+                    </li>
+                    <li class="nav-item">
+                        <form method="post" action="{% url 'logout' %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn nav-link border-0 bg-transparent">Выход</button>
+                        </form>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'login' in request.path %}active{% endif %}" href="{% url 'login' %}">Вход</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'register' in request.path %}active{% endif %}" href="{% url 'register' %}">Регистрация</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>

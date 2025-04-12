@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block title %}Профиль пользователя{% endblock %}
+
+{% block content %}
+<div class="container" id="profile-page">
+    <h1 class="my-4">Профиль пользователя</h1>
+    
+    <div id="profile-container">
+        {% include "members/partials/profile_content.html" %}
+    </div>
+</div>
+{% endblock %}

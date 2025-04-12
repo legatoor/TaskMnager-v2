@@ -1,0 +1,302 @@
+{% extends 'base.html' %}
+
+{% block title %}Задачи{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Задачи</h1>
+        <a href="{% url 'task-create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Новая Задача
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Фильтры</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="category" class="form-label">Категория</label>
+                    <select name="category" id="category" class="form-select category-select">
+                        <option value="">Все Категории</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:"i" %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="status" class="form-label">Статус</label>
+                    <select name="status" id="status" class="form-select">
+                        <option value="">Все Статусы</option>
+                        {% for status_value, status_name in status_choices %}
+                        <option value="{{ status_value }}" {% if request.GET.status == status_value %}selected{% endif %}>
+                            {% if status_value == 'TODO' %}К выполнению
+                            {% elif status_value == 'IN_PROGRESS' %}В процессе
+                            {% elif status_value == 'REVIEW' %}На проверке
+                            {% elif status_value == 'DONE' %}Выполнено
+                            {% else %}{{ status_name }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="assigned_to" class="form-label">Исполнитель</label>
+                    <select name="assigned_to" id="assigned_to" class="form-select">
+                        <option value="">Все исполнители</option>
+                        <option value="{{ request.user.id }}" {% if request.GET.assigned_to == request.user.id|stringformat:"i" %}selected{% endif %}>
+                            Мои Задачи
+                        </option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if request.GET.assigned_to == user.id|stringformat:"i" %}selected{% endif %}>
+                            {{ user.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="created_by" class="form-label">Создал</label>
+                    <select name="created_by" id="created_by" class="form-select">
+                        <option value="">Все создатели</option>
+                        <option value="{{ request.user.id }}" {% if request.GET.created_by == request.user.id|stringformat:"i" %}selected{% endif %}>
+                            Созданные мной
+                        </option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if request.GET.created_by == user.id|stringformat:"i" %}selected{% endif %}>
+                            {{ user.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter"></i> Применить фильтры
+                    </button>
+                    <a href="{% url 'task-list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Сбросить
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Kanban board with data-status attributes -->
+        <div class="row task-container">
+            <div class="col-md-3 kanban-column" data-status="TODO">
+                <div class="kanban-header bg-light p-2 mb-2">
+                    <h5>К выполнению <span class="badge bg-secondary task-count" data-status="TODO">{{ todo_count }}</span></h5>
+                </div>
+                <div class="task-list">
+                    {% for task in todo_tasks %}
+                        {% include "members/partials/task_card.html" %}
+                    {% endfor %}
+                    {% if todo_tasks|length == 0 %}
+                    <div class="empty-column-message text-center p-3 text-muted">
+                        <i class="fas fa-tasks"></i> Нет задач
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="col-md-3 kanban-column" data-status="IN_PROGRESS">
+                <div class="kanban-header bg-light p-2 mb-2">
+                    <h5>В процессе <span class="badge bg-secondary task-count" data-status="IN_PROGRESS">{{ in_progress_count }}</span></h5>
+                </div>
+                <div class="task-list">
+                    {% for task in in_progress_tasks %}
+                        {% include "members/partials/task_card.html" %}
+                    {% endfor %}
+                    {% if in_progress_tasks|length == 0 %}
+                    <div class="empty-column-message text-center p-3 text-muted">
+                        <i class="fas fa-tasks"></i> Нет задач
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="col-md-3 kanban-column" data-status="REVIEW">
+                <div class="kanban-header bg-light p-2 mb-2">
+                    <h5>На проверке <span class="badge bg-secondary task-count" data-status="REVIEW">{{ review_count }}</span></h5>
+                </div>
+                <div class="task-list">
+                    {% for task in review_tasks %}
+                        {% include "members/partials/task_card.html" %}
+                    {% endfor %}
+                    {% if review_tasks|length == 0 %}
+                    <div class="empty-column-message text-center p-3 text-muted">
+                        <i class="fas fa-tasks"></i> Нет задач
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="col-md-3 kanban-column" data-status="DONE">
+                <div class="kanban-header bg-light p-2 mb-2">
+                    <h5>Выполнено <span class="badge bg-secondary task-count" data-status="DONE">{{ done_count }}</span></h5>
+                </div>
+                <div class="task-list">
+                    {% for task in done_tasks %}
+                        {% include "members/partials/task_card.html" %}
+                    {% endfor %}
+                    {% if done_tasks|length == 0 %}
+                    <div class="empty-column-message text-center p-3 text-muted">
+                        <i class="fas fa-tasks"></i> Нет задач
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Update task status via WebSocket when drag-and-drop or status change occurs
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add event listeners for status dropdowns
+        document.querySelectorAll('.task-status-select').forEach(function(select) {
+            select.addEventListener('change', function() {
+                const taskId = this.dataset.taskId;
+                const newStatus = this.value;
+                
+                // Try to update via WebSocket first
+                const updated = window.updateTaskStatusViaWS(taskId, newStatus);
+                
+                // Fall back to form submission if WebSocket fails
+                if (!updated) {
+                    this.form.submit();
+                }
+            });
+        });
+
+        // Add event handlers for task cards to make them draggable between columns
+        document.querySelectorAll('.task-card').forEach(taskCard => {
+            taskCard.addEventListener('dragstart', handleDragStart);
+            taskCard.addEventListener('dragend', handleDragEnd);
+        });
+        
+        // Add event handlers for kanban columns to accept dropped task cards
+        document.querySelectorAll('.kanban-column').forEach(column => {
+            column.addEventListener('dragover', handleDragOver);
+            column.addEventListener('dragenter', handleDragEnter);
+            column.addEventListener('dragleave', handleDragLeave);
+            column.addEventListener('drop', handleDrop);
+        });
+        
+        // Drag and drop handlers
+        let draggedCard = null;
+        let sourceColumn = null;
+        
+        function handleDragStart(e) {
+            draggedCard = this;
+            sourceColumn = this.closest('.task-list');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.dataset.taskId);
+            
+            setTimeout(() => this.classList.add('dragging'), 0);
+        }
+        
+        function handleDragEnd() {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.kanban-column').forEach(col => {
+                col.classList.remove('drop-active');
+            });
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            return false;
+        }
+        
+        function handleDragEnter(e) {
+            this.classList.add('drop-active');
+        }
+        
+        function handleDragLeave(e) {
+            this.classList.remove('drop-active');
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drop-active');
+            
+            const taskId = e.dataTransfer.getData('text/plain');
+            const newStatus = this.dataset.status;
+            const taskCard = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            
+            if (!taskCard) return;
+            
+            const currentStatus = taskCard.closest('.kanban-column').dataset.status;
+            if (currentStatus === newStatus) return;
+            
+            // Update via WebSocket
+            const updated = window.updateTaskStatusViaWS(taskId, newStatus);
+            
+            if (!updated) {
+                // Fallback to traditional AJAX
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                
+                fetch(`/tasks/${taskId}/update-status/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to update status');
+                    return response.json();
+                })
+                .then(data => {
+                    // Move card to appropriate column
+                    const targetColumn = document.querySelector(`.kanban-column[data-status="${newStatus}"] .task-list`);
+                    targetColumn.appendChild(taskCard);
+                    taskCard.dataset.status = newStatus;
+                    
+                    // Update status in dropdown
+                    const statusSelect = taskCard.querySelector('.task-status-select');
+                    if (statusSelect) statusSelect.value = newStatus;
+                    
+                    // Update counts
+                    updateTaskCounts();
+                    
+                    // Remove empty column messages if necessary
+                    checkEmptyColumns();
+                })
+                .catch(error => console.error('Error updating task status:', error));
+            }
+        }
+        
+        function updateTaskCounts() {
+            document.querySelectorAll('.kanban-column').forEach(column => {
+                const status = column.dataset.status;
+                const count = column.querySelectorAll('.task-card').length;
+                column.querySelector('.task-count').textContent = count;
+            });
+        }
+        
+        function checkEmptyColumns() {
+            document.querySelectorAll('.task-list').forEach(list => {
+                const hasCards = list.querySelectorAll('.task-card').length > 0;
+                const hasEmptyMessage = list.querySelector('.empty-column-message');
+                
+                if (!hasCards && !hasEmptyMessage) {
+                    // Add empty message
+                    list.innerHTML += `
+                        <div class="empty-column-message text-center p-3 text-muted">
+                            <i class="fas fa-tasks"></i> Нет задач
+                        </div>
+                    `;
+                } else if (hasCards && hasEmptyMessage) {
+                    // Remove empty message
+                    hasEmptyMessage.remove();
+                }
+            });
+        }
+    });
+    </script>
+</div>
+{% endblock %}

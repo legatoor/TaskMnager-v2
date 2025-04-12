@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Не Найдено{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-center">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    <h1 class="display-1 text-danger">404</h1>
+                    <h2 class="mb-4">Страница Не Найдена</h2>
+                    
+                    <p class="lead text-muted mb-4">
+                        {{ message|default:"Страница, которую вы ищете, не существует или у вас нет разрешения на доступ к ней." }}
+                    </p>
+                    
+                    <div class="mt-4">
+                        <a href="{% url 'home' %}" class="btn btn-primary me-2">
+                            <i class="fas fa-home me-2"></i>На Главную
+                        </a>
+                        <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Назад
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

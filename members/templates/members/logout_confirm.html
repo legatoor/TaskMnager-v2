@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Подтверждение Выхода{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-warning">
+                    <h4 class="mb-0">Подтверждение Выхода</h4>
+                </div>
+                <div class="card-body text-center p-4">
+                    <p class="lead">Вы уверены, что хотите выйти?</p>
+                    
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-warning">Да, Выйти</button>
+                            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary ms-2">Отмена</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

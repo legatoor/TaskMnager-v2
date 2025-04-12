@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block title %}Панель Управления{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="my-4">Панель Управления</h1>
+    
+    <!-- Assigned Tasks Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Мои Задачи</h5>
+            <a href="{% url 'task-create' %}" class="btn btn-sm btn-light">
+                <i class="fas fa-plus"></i> Новая Задача
+            </a>
+        </div>
+        <div class="card-body">
+            {% if user_tasks %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Статус</th>
+                                <th>Приоритет</th>
+                                <th>Срок</th>
+                                <th>Категория</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in user_tasks %}
+                                <tr>
+                                    <td>{{ task.title }}</td>
+                                    <td>
+                                        {% if task.status == 'TODO' %}
+                                            <span class="badge bg-secondary">К выполнению</span>
+                                        {% elif task.status == 'IN_PROGRESS' %}
+                                            <span class="badge bg-primary">В процессе</span>
+                                        {% elif task.status == 'REVIEW' %}
+                                            <span class="badge bg-warning">На проверке</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Выполнено</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if task.priority == 4 %}
+                                            <span class="badge bg-danger">Срочно</span>
+                                        {% elif task.priority == 3 %}
+                                            <span class="badge bg-warning">Высокий</span>
+                                        {% elif task.priority == 2 %}
+                                            <span class="badge bg-info">Средний</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Низкий</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if task.due_date %}
+                                            {{ task.due_date|date:"d M, Y" }}
+                                        {% else %}
+                                            Нет срока
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if task.category %}
+                                            <span class="badge" style="background-color: {{ task.category.color }}">
+                                                {{ task.category.name }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">Нет</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'task-detail' task.id %}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'task-update' task.id %}" class="btn btn-sm btn-warning">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">У вас нет назначенных задач.</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Created Tasks Section -->
+    <div class="card">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Созданные Мной Задачи</h5>
+            <a href="{% url 'task-create' %}" class="btn btn-sm btn-light">
+                <i class="fas fa-plus"></i> Новая Задача
+            </a>
+        </div>
+        <div class="card-body">
+            {% if created_tasks %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Статус</th>
+                                <th>Приоритет</th>
+                                <th>Назначено</th>
+                                <th>Срок</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in created_tasks %}
+                                <tr>
+                                    <td>{{ task.title }}</td>
+                                    <td>
+                                        {% if task.status == 'TODO' %}
+                                            <span class="badge bg-secondary">К выполнению</span>
+                                        {% elif task.status == 'IN_PROGRESS' %}
+                                            <span class="badge bg-primary">В процессе</span>
+                                        {% elif task.status == 'REVIEW' %}
+                                            <span class="badge bg-warning">На проверке</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Выполнено</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if task.priority == 4 %}
+                                            <span class="badge bg-danger">Срочно</span>
+                                        {% elif task.priority == 3 %}
+                                            <span class="badge bg-warning">Высокий</span>
+                                        {% elif task.priority == 2 %}
+                                            <span class="badge bg-info">Средний</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Низкий</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ task.assigned_to.username }}</td>
+                                    <td>
+                                        {% if task.due_date %}
+                                            {{ task.due_date|date:"d M, Y" }}
+                                        {% else %}
+                                            Нет срока
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'task-detail' task.id %}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'task-update' task.id %}" class="btn btn-sm btn-warning">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'task-delete' task.id %}" class="btn btn-sm btn-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">Вы еще не создали ни одной задачи.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

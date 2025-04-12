@@ -1,0 +1,1081 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru" class="h-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Менеджер Задач{% endblock %}</title>
+    <!-- Add favicon -->
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+    <link rel="shortcut icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        main {
+            flex: 1 0 auto;
+        }
+        footer {
+            flex-shrink: 0;
+        }
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+        
+        /* Floating user list window */
+        .user-floating-window {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 250px;
+            max-height: 400px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            z-index: 1040;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+        
+        .user-floating-header {
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .user-floating-body {
+            overflow-y: auto;
+            max-height: 350px;
+            padding: 0;
+        }
+        
+        .user-floating-footer {
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+        
+        .user-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .user-list-item {
+            padding: 8px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .user-status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .user-status-online {
+            background-color: #28a745;
+        }
+        
+        .user-status-offline {
+            background-color: #6c757d;
+        }
+        
+        .user-floating-toggle {
+            cursor: pointer;
+        }
+        
+        /* Updated minimized styling for icon-only view */
+        .user-floating-minimized {
+            width: auto;
+            height: auto;
+            max-height: 40px;
+            border-radius: 50%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            background-color: #007bff;
+            cursor: pointer;
+        }
+        
+        .user-floating-minimized .user-floating-header {
+            padding: 10px;
+            border-radius: 50%;
+            border-bottom: none;
+            background-color: #007bff;
+            justify-content: center;
+            min-width: 40px;
+            min-height: 40px;
+            position: relative;
+        }
+        
+        .user-floating-minimized .window-title {
+            display: none;
+        }
+        
+        .user-floating-minimized .user-floating-toggle {
+            color: white;
+        }
+        
+        .user-floating-minimized .user-floating-body,
+        .user-floating-minimized .user-floating-footer {
+            display: none;
+        }
+        
+        .user-floating-minimized .user-count-bubble {
+           
+            top: -5px;
+            right: -5px;
+            background-color: #28a745;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            min-width: 18px;
+            min-height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid white;
+        }
+        
+        .user-floating-window .users-icon {
+            color: white;
+            font-size: 1.2rem;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="d-flex flex-column h-100">
+    {% include 'partials/header.html' %}
+
+    <main class="container py-4 flex-shrink-0">
+        {% include 'partials/messages.html' %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    {% include 'partials/footer.html' %}
+
+    <!-- Toast container for notifications -->
+    <div class="toast-container">
+        <div id="statusUpdateToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-info-circle text-primary me-2"></i>
+                <strong class="me-auto">Уведомление</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="statusUpdateToastMessage">
+                Задача обновлена
+            </div>
+        </div>
+    </div>
+    
+    <!-- Floating Users Online Window -->
+    {% if user.is_authenticated %}
+    <div id="userFloatingWindow" class="user-floating-window">
+        <div class="user-floating-header">
+            <strong class="window-title">Пользователи</strong>
+            <div class="d-flex align-items-center">
+                <span id="onlineUserCount" class="badge user-count-bubble">0</span>
+                <span class="user-floating-toggle" id="userFloatingToggle">
+                    <i class="fas fa-minus"></i>
+                </span>
+            </div>
+            <!-- Icon for minimized view -->
+            <i class="fas fa-users users-icon"></i>
+        </div>
+        <div class="user-floating-body">
+            <ul class="user-list" id="userList">
+                <li class="text-center p-3 text-muted">Загрузка...</li>
+            </ul>
+        </div>
+        <div class="user-floating-footer">
+            Обновляется в реальном времени
+        </div>
+    </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    {% if user.is_authenticated %}
+    <!-- WebSocket for user status -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Toggle floating window
+            const toggle = document.getElementById('userFloatingToggle');
+            const floatingWindow = document.getElementById('userFloatingWindow');
+            const windowTitle = document.querySelector('.window-title');
+            
+            // Click handler for the entire window when minimized
+            floatingWindow.addEventListener('click', function(e) {
+                if (floatingWindow.classList.contains('user-floating-minimized') && 
+                    !e.target.classList.contains('user-count-bubble')) {
+                    floatingWindow.classList.remove('user-floating-minimized');
+                    toggle.innerHTML = '<i class="fas fa-minus"></i>';
+                }
+            });
+            
+            toggle.addEventListener('click', function(e) {
+                // Stop propagation to prevent the window click handler from firing
+                e.stopPropagation();
+                
+                floatingWindow.classList.toggle('user-floating-minimized');
+                
+                // Update toggle icon
+                if (floatingWindow.classList.contains('user-floating-minimized')) {
+                    toggle.innerHTML = '<i class="fas fa-plus"></i>';
+                } else {
+                    toggle.innerHTML = '<i class="fas fa-minus"></i>';
+                }
+            });
+            
+            // Initialize in minimized state
+            floatingWindow.classList.add('user-floating-minimized');
+            toggle.innerHTML = '<i class="fas fa-plus"></i>';
+            
+            // WebSocket connection
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            const wsHost = window.location.host;
+            const wsUrl = `${wsProtocol}${wsHost}/ws/user_status/`;
+            
+            console.log('Attempting WebSocket connection to:', wsUrl);
+            
+            let socket = null;
+            let reconnectInterval = 1000; // Start with 1 second delay
+            const maxReconnectInterval = 30000; // Max 30 seconds
+            
+            function connectWebSocket() {
+                socket = new WebSocket(wsUrl);
+                
+                socket.onopen = function(e) {
+                    console.log('WebSocket connection established');
+                    reconnectInterval = 1000; // Reset reconnect interval
+                };
+                
+                socket.onclose = function(e) {
+                    console.log('WebSocket connection closed. Reconnecting...');
+                    // Reconnect with exponential backoff
+                    setTimeout(function() {
+                        connectWebSocket();
+                        reconnectInterval = Math.min(reconnectInterval * 1.5, maxReconnectInterval);
+                    }, reconnectInterval);
+                };
+                
+                socket.onerror = function(err) {
+                    console.error('WebSocket error:', err);
+                };
+                
+                socket.onmessage = function(e) {
+                    const data = JSON.parse(e.data);
+                    
+                    if (data.type === 'user_list') {
+                        // Update full user list
+                        updateUserList(data.users);
+                    } else if (data.type === 'status_change') {
+                        // Update single user status
+                        updateUserStatus(data.user_id, data.status);
+                    }
+                };
+            }
+            
+            // Initialize connection
+            connectWebSocket();
+            
+            // Handle user list updates
+            function updateUserList(users) {
+                const userList = document.getElementById('userList');
+                const onlineUserCount = document.getElementById('onlineUserCount');
+                
+                if (users.length === 0) {
+                    userList.innerHTML = '<li class="text-center p-3 text-muted">Нет пользователей онлайн</li>';
+                    onlineUserCount.textContent = '0';
+                    return;
+                }
+                
+                // Sort users: online first, then alphabetically
+                users.sort((a, b) => {
+                    const aStatus = a.status || 'offline';
+                    const bStatus = b.status || 'offline';
+                    
+                    if (aStatus === bStatus) {
+                        return a.username.localeCompare(b.username);
+                    }
+                    return aStatus === 'online' ? -1 : 1;
+                });
+                
+                // Count online users
+                const onlineCount = users.filter(user => user.status === 'online').length;
+                onlineUserCount.textContent = onlineCount;
+                
+                // Update user list HTML
+                userList.innerHTML = '';
+                users.forEach(function(user) {
+                    const status = user.status || 'offline';
+                    const userItem = document.createElement('li');
+                    userItem.className = 'user-list-item';
+                    userItem.dataset.userId = user.id;
+                    userItem.innerHTML = `
+                        <span class="user-status-indicator user-status-${status}"></span>
+                        <span>${user.username}</span>
+                    `;
+                    userList.appendChild(userItem);
+                });
+            }
+            
+            function updateUserStatus(userId, status) {
+                const userItem = document.querySelector(`.user-list-item[data-user-id="${userId}"]`);
+                if (userItem) {
+                    // Update the status indicator
+                    const indicator = userItem.querySelector('.user-status-indicator');
+                    indicator.classList.remove('user-status-online', 'user-status-offline');
+                    indicator.classList.add(`user-status-${status}`);
+                    
+                    // Recalculate online count
+                    const onlineItems = document.querySelectorAll('.user-status-online').length;
+                    document.getElementById('onlineUserCount').textContent = onlineItems;
+                }
+            }
+            
+            // Clean up on page unload
+            window.addEventListener('beforeunload', function() {
+                if (socket) {
+                    socket.close();
+                }
+            });
+        });
+    </script>
+    {% endif %}
+    
+    <script>
+    // WebSocket connection for real-time updates
+    document.addEventListener('DOMContentLoaded', function() {
+        // Only connect if user is authenticated
+        {% if user.is_authenticated %}
+        
+        // Already existing user status WebSocket code
+        // ...existing code...
+        
+        // New WebSocket for task updates
+        const taskWsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const taskWsHost = window.location.host;
+        const taskWsUrl = `${taskWsProtocol}${taskWsHost}/ws/tasks/`;
+        
+        let taskSocket = null;
+        let taskReconnectInterval = 1000;
+        const maxTaskReconnectInterval = 30000;
+        
+        function connectTaskWebSocket() {
+            taskSocket = new WebSocket(taskWsUrl);
+            
+            taskSocket.onopen = function(e) {
+                console.log('Task WebSocket connection established');
+                taskReconnectInterval = 1000;
+            };
+            
+            taskSocket.onclose = function(e) {
+                console.log('Task WebSocket connection closed. Reconnecting...');
+                setTimeout(function() {
+                    connectTaskWebSocket();
+                    taskReconnectInterval = Math.min(taskReconnectInterval * 1.5, maxTaskReconnectInterval);
+                }, taskReconnectInterval);
+            };
+            
+            taskSocket.onerror = function(err) {
+                console.error('Task WebSocket error:', err);
+            };
+            
+            taskSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                console.log('Received task update:', data);
+                
+                switch(data.type) {
+                    case 'connection_status':
+                        handleConnectionStatus(data);
+                        break;
+                    case 'task_update':
+                        handleTaskUpdate(data);
+                        break;
+                    case 'task_comment':
+                        handleTaskComment(data);
+                        break;
+                    case 'task_comment_deleted':
+                        handleTaskCommentDeleted(data);
+                        break;
+                    case 'notification':
+                        handleNotification(data);
+                        break;
+                    case 'notification_update':
+                        handleNotificationUpdate(data);
+                        break;
+                    case 'category_update':
+                        handleCategoryUpdate(data);
+                        break;
+                    case 'task_observers_update':
+                        handleTaskObserversUpdate(data);
+                        break;
+                    case 'user_update':
+                        handleUserUpdate(data);
+                        break;
+                    case 'user_profile_update':
+                        handleUserProfileUpdate(data);
+                        break;
+                    case 'error':
+                        console.error('WebSocket error:', data.message);
+                        break;
+                    case 'status_update_response':
+                        // Handle response to our status update request
+                        if (data.success) {
+                            console.log(`Successfully updated task ${data.task_id} status`);
+                        } else {
+                            console.error(`Failed to update task status: ${data.message}`);
+                        }
+                        break;
+                }
+            };
+        }
+        
+        // Initialize connection
+        connectTaskWebSocket();
+        
+        // Handle connection status messages
+        function handleConnectionStatus(data) {
+            console.log(`WebSocket ${data.status}: ${data.message}`);
+        }
+        
+        // Handle task updates (created, updated, deleted)
+        function handleTaskUpdate(data) {
+            const taskId = data.task_id;
+            const action = data.action;
+            const taskData = data.task_data;
+            
+            // Check if we're on a task-related page
+            const taskListElement = document.querySelector('.task-container');
+            if (taskListElement) {
+                // We're on a page with tasks
+                if (action === 'created') {
+                    // Add new task to the list
+                    addTaskToList(taskData);
+                } else if (action === 'updated') {
+                    // Update existing task
+                    updateTaskInList(taskData);
+                } else if (action === 'deleted') {
+                    // Remove task from list
+                    removeTaskFromList(taskId);
+                }
+            }
+            
+            // If we're on a specific task detail page
+            const taskDetailElement = document.querySelector(`#task-detail-${taskId}`);
+            if (taskDetailElement) {
+                if (action === 'updated') {
+                    updateTaskDetail(taskData);
+                } else if (action === 'deleted') {
+                    // Redirect to task list if the current task was deleted
+                    window.location.href = '/tasks/';
+                }
+            }
+            
+            // Update task counts
+            updateTaskCounts();
+            
+            // Show toast notification
+            showUpdateToast(action, taskData);
+        }
+        
+        // Add a new task to the kanban board or task list
+        function addTaskToList(taskData) {
+            const kanbanColumn = document.querySelector(`.kanban-column[data-status="${taskData.status}"]`);
+            if (kanbanColumn) {
+                // We're on the Kanban board view
+                const taskList = kanbanColumn.querySelector('.task-list');
+                
+                // Get task HTML template and append to the column
+                fetch(`/tasks/task-template/${taskData.id}/`)
+                    .then(response => response.text())
+                    .then(html => {
+                        // Check if "no tasks" message exists and remove it
+                        const emptyMessage = taskList.querySelector('.empty-column-message');
+                        if (emptyMessage) {
+                            emptyMessage.remove();
+                        }
+                        
+                        taskList.insertAdjacentHTML('afterbegin', html);
+                        
+                        // Initialize any JS functionality on the new card
+                        const newCard = taskList.querySelector(`.task-card[data-task-id="${taskData.id}"]`);
+                        if (newCard) {
+                            initTaskCard(newCard);
+                        }
+                    });
+            }
+            
+            // For list view
+            const taskList = document.querySelector('#task-list-container');
+            if (taskList) {
+                fetch(`/tasks/task-row-template/${taskData.id}/`)
+                    .then(response => response.text())
+                    .then(html => {
+                        taskList.insertAdjacentHTML('afterbegin', html);
+                    });
+            }
+        }
+        
+        // Update an existing task in the UI
+        function updateTaskInList(taskData) {
+            // Update in kanban board
+            const taskCard = document.querySelector(`.task-card[data-task-id="${taskData.id}"]`);
+            if (taskCard) {
+                // If the status changed, move the card to the correct column
+                const currentStatus = taskCard.closest('.kanban-column').dataset.status;
+                if (currentStatus !== taskData.status) {
+                    const newColumn = document.querySelector(`.kanban-column[data-status="${taskData.status}"]`);
+                    if (newColumn) {
+                        const taskList = newColumn.querySelector('.task-list');
+                        taskList.appendChild(taskCard);
+                        
+                        // Update the card's data attribute
+                        taskCard.dataset.status = taskData.status;
+                    }
+                }
+                
+                // Update card content
+                taskCard.querySelector('.task-title').textContent = taskData.title;
+                taskCard.querySelector('.task-priority').textContent = getPriorityLabel(taskData.priority);
+                taskCard.querySelector('.task-priority').className = `task-priority priority-${taskData.priority}`;
+                
+                // Update assigned user if present
+                const assignedElement = taskCard.querySelector('.assigned-to');
+                if (assignedElement && taskData.assigned_to) {
+                    assignedElement.textContent = taskData.assigned_to.username;
+                }
+            }
+            
+            // Update in list view
+            const taskRow = document.querySelector(`tr[data-task-id="${taskData.id}"]`);
+            if (taskRow) {
+                // Update row content
+                const titleEl = taskRow.querySelector('.task-title');
+                if (titleEl) titleEl.textContent = taskData.title;
+                
+                const statusEl = taskRow.querySelector('.task-status');
+                if (statusEl) statusEl.textContent = getStatusLabel(taskData.status);
+                
+                const priorityEl = taskRow.querySelector('.task-priority');
+                if (priorityEl) {
+                    priorityEl.textContent = getPriorityLabel(taskData.priority);
+                    priorityEl.className = `task-priority priority-${taskData.priority}`;
+                }
+                
+                // Update assigned user
+                const assignedEl = taskRow.querySelector('.task-assigned');
+                if (assignedEl && taskData.assigned_to) {
+                    assignedEl.textContent = taskData.assigned_to.username;
+                }
+                
+                // Update due date
+                const dueDateEl = taskRow.querySelector('.task-due-date');
+                if (dueDateEl && taskData.due_date) {
+                    dueDateEl.textContent = new Date(taskData.due_date).toLocaleDateString('ru-RU');
+                }
+            }
+        }
+        
+        // Remove a task from the UI
+        function removeTaskFromList(taskId) {
+            // Remove from kanban board
+            const taskCard = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (taskCard) {
+                const column = taskCard.closest('.kanban-column');
+                taskCard.remove();
+                
+                // Add "no tasks" message if column is now empty
+                const taskList = column.querySelector('.task-list');
+                if (taskList.children.length === 0) {
+                    taskList.innerHTML = `
+                        <div class="empty-column-message text-center p-3 text-muted">
+                            <i class="fas fa-tasks"></i> Нет задач
+                        </div>
+                    `;
+                }
+            }
+            
+            // Remove from list view
+            const taskRow = document.querySelector(`tr[data-task-id="${taskId}"]`);
+            if (taskRow) {
+                taskRow.remove();
+            }
+        }
+        
+        // Update task detail page
+        function updateTaskDetail(taskData) {
+            const detailPage = document.querySelector(`#task-detail-${taskData.id}`);
+            if (detailPage) {
+                // Update title and description
+                const titleElement = detailPage.querySelector('.task-title');
+                if (titleElement) titleElement.textContent = taskData.title;
+                
+                const descriptionElement = detailPage.querySelector('.task-description');
+                if (descriptionElement) descriptionElement.textContent = taskData.description;
+                
+                // Update status display
+                const statusElement = detailPage.querySelector('.task-status');
+                if (statusElement) statusElement.textContent = getStatusLabel(taskData.status);
+                
+                // Update priority display
+                const priorityElement = detailPage.querySelector('.task-priority');
+                if (priorityElement) {
+                    priorityElement.textContent = getPriorityLabel(taskData.priority);
+                    priorityElement.className = `badge priority-${taskData.priority}`;
+                }
+                
+                // Update assigned user
+                const assignedElement = detailPage.querySelector('.task-assigned-to');
+                if (assignedElement && taskData.assigned_to) {
+                    assignedElement.textContent = taskData.assigned_to.username;
+                }
+                
+                // Update due date
+                const dueDate = detailPage.querySelector('.task-due-date');
+                if (dueDate && taskData.due_date) {
+                    dueDate.textContent = new Date(taskData.due_date).toLocaleDateString();
+                }
+                
+                // Update status dropdown if present
+                const statusSelect = detailPage.querySelector('#task-status-select');
+                if (statusSelect) {
+                    statusSelect.value = taskData.status;
+                }
+            }
+        }
+        
+        // Handle task count updates
+        function updateTaskCounts() {
+            // Update task counts in the sidebar or header
+            document.querySelectorAll('.task-count').forEach(function(counter) {
+                const status = counter.dataset.status;
+                const count = document.querySelectorAll(`.kanban-column[data-status="${status}"] .task-card`).length;
+                counter.textContent = count;
+            });
+        }
+        
+        // Handle new comments
+        function handleTaskComment(data) {
+            const taskId = data.task_id;
+            const commentData = data.comment_data;
+            
+            // Only update if we're on the task detail page for this task
+            const commentsList = document.querySelector(`#task-${taskId}-comments`);
+            if (commentsList) {
+                // Create comment element
+                const commentElement = document.createElement('div');
+                commentElement.className = 'comment p-3 border-bottom';
+                commentElement.dataset.commentId = commentData.id;
+                commentElement.innerHTML = `
+                    <div class="d-flex justify-content-between">
+                        <strong>${commentData.user.username}</strong>
+                        <small class="text-muted">${formatDate(new Date(commentData.created_at))}</small>
+                    </div>
+                    <p class="mt-2 mb-0">${commentData.text}</p>
+                `;
+                
+                // Add to top of list
+                commentsList.prepend(commentElement);
+                
+                // Clear comment input if it exists
+                const commentInput = document.querySelector('#comment-text');
+                if (commentInput) {
+                    commentInput.value = '';
+                }
+                
+                // Increment comment counter
+                const commentCounter = document.querySelector('#comment-count');
+                if (commentCounter) {
+                    const currentCount = parseInt(commentCounter.textContent) || 0;
+                    commentCounter.textContent = currentCount + 1;
+                }
+            }
+        }
+        
+        // Handle comment deletion
+        function handleTaskCommentDeleted(data) {
+            const commentId = data.comment_id;
+            const taskId = data.task_id;
+            
+            // Find and remove the comment element
+            const commentElement = document.querySelector(`.comment[data-comment-id="${commentId}"]`);
+            if (commentElement) {
+                commentElement.remove();
+                
+                // Decrement comment counter
+                const commentCounter = document.querySelector('#comment-count');
+                if (commentCounter) {
+                    const currentCount = parseInt(commentCounter.textContent) || 0;
+                    if (currentCount > 0) {
+                        commentCounter.textContent = currentCount - 1;
+                    }
+                }
+            }
+        }
+        
+        // Handle task observers update
+        function handleTaskObserversUpdate(data) {
+            const taskId = data.task_id;
+            const taskData = data.task_data;
+            const action = data.action;
+            
+            // Update observers list if on task detail page
+            const observersList = document.querySelector(`#task-${taskId}-observers`);
+            if (observersList) {
+                // Refresh the observers list by fetching updated HTML
+                fetch(`/tasks/${taskId}/observers-partial/`)
+                    .then(response => response.text())
+                    .then(html => {
+                        observersList.innerHTML = html;
+                    });
+            }
+        }
+        
+        // Handle notifications
+        function handleNotification(data) {
+            // Update notification badge in navbar
+            const notificationBadge = document.querySelector('.notification-badge');
+            if (notificationBadge) {
+                const currentCount = parseInt(notificationBadge.textContent) || 0;
+                notificationBadge.textContent = currentCount + 1;
+                notificationBadge.style.display = 'inline-block';
+            }
+            
+            // Add to notifications dropdown if present
+            const notificationsList = document.querySelector('#notifications-list');
+            if (notificationsList) {
+                const notificationElement = document.createElement('a');
+                notificationElement.className = 'dropdown-item d-flex align-items-center py-2';
+                notificationElement.href = data.task_id ? `/tasks/${data.task_id}/` : '#';
+                notificationElement.innerHTML = `
+                    <div class="me-3">
+                        <div class="bg-primary rounded-circle p-2">
+                            <i class="fas fa-bell text-white small"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="mb-0">${data.message}</p>
+                        <small class="text-muted">Только что</small>
+                    </div>
+                `;
+                
+                // Add to top of list
+                if (notificationsList.querySelector('.no-notifications')) {
+                    // Remove "no notifications" message
+                    notificationsList.innerHTML = '';
+                }
+                notificationsList.prepend(notificationElement);
+            }
+            
+            // Show toast notification
+            showNotificationToast(data.message);
+        }
+        
+        // Handle notification updates (mark as read, etc)
+        function handleNotificationUpdate(data) {
+            const notificationId = data.notification_id;
+            const action = data.action;
+            const userId = data.user_id;
+            
+            // Only process if it's for the current user
+            if (userId === {{ user.id }}) {
+                // Update notification counter in navbar
+                updateNotificationCounter();
+                
+                // If on notifications page, update read status
+                const notificationItem = document.querySelector(`.notification-item[data-notification-id="${notificationId}"]`);
+                if (notificationItem && action === 'updated') {
+                    notificationItem.classList.remove('bg-light');
+                    notificationItem.querySelector('.badge-new').style.display = 'none';
+                }
+            }
+        }
+        
+        // Update notification counter based on current data
+        function updateNotificationCounter() {
+            fetch('/api/notifications/unread-count/')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.querySelector('.notification-badge');
+                    if (badge) {
+                        if (data.count > 0) {
+                            badge.textContent = data.count;
+                            badge.style.display = 'inline-block';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                });
+        }
+        
+        // Handle category updates
+        function handleCategoryUpdate(data) {
+            const categoryId = data.category_id;
+            const action = data.action;
+            const categoryData = data.category_data;
+            
+            // Update category dropdowns
+            document.querySelectorAll('select.category-select').forEach(function(select) {
+                if (action === 'created') {
+                    // Add new option
+                    const option = document.createElement('option');
+                    option.value = categoryData.id;
+                    option.textContent = categoryData.name;
+                    select.appendChild(option);
+                } else if (action === 'updated') {
+                    // Update existing option
+                    const option = select.querySelector(`option[value="${categoryId}"]`);
+                    if (option) {
+                        option.textContent = categoryData.name;
+                    }
+                } else if (action === 'deleted') {
+                    // Remove option
+                    const option = select.querySelector(`option[value="${categoryId}"]`);
+                    if (option) {
+                        option.remove();
+                    }
+                }
+            });
+            
+            // Update category pills/badges
+            document.querySelectorAll(`.category-badge[data-category-id="${categoryId}"]`).forEach(function(badge) {
+                if (action === 'updated') {
+                    badge.textContent = categoryData.name;
+                    badge.style.backgroundColor = categoryData.color;
+                } else if (action === 'deleted') {
+                    badge.remove();
+                }
+            });
+            
+            // If on categories page, update the list
+            if (document.querySelector('#categories-list')) {
+                if (action === 'created' || action === 'updated') {
+                    // Refresh the category list
+                    fetch('/categories/?partial=true')
+                        .then(response => response.text())
+                        .then(html => {
+                            document.querySelector('#categories-list').innerHTML = html;
+                        });
+                } else if (action === 'deleted') {
+                    // Remove the category row
+                    const categoryRow = document.querySelector(`.category-row[data-category-id="${categoryId}"]`);
+                    if (categoryRow) categoryRow.remove();
+                }
+            }
+        }
+        
+        // Handle user updates
+        function handleUserUpdate(data) {
+            const userId = data.user_id;
+            const userData = data.user_data;
+            
+            // Update user references in the UI
+            document.querySelectorAll(`.user-reference[data-user-id="${userId}"]`).forEach(function(element) {
+                element.textContent = userData.username;
+            });
+            
+            // If on employee list page, update the user row
+            const userRow = document.querySelector(`.user-row[data-user-id="${userId}"]`);
+            if (userRow) {
+                const usernameEl = userRow.querySelector('.user-username');
+                if (usernameEl) usernameEl.textContent = userData.username;
+                
+                const emailEl = userRow.querySelector('.user-email');
+                if (emailEl) emailEl.textContent = userData.email;
+            }
+        }
+        
+        // Handle user profile updates
+        function handleUserProfileUpdate(data) {
+            const userId = data.user_id;
+            const userData = data.user_data;
+            
+            // Update profile picture if applicable
+            document.querySelectorAll(`.user-profile-pic[data-user-id="${userId}"]`).forEach(function(img) {
+                if (userData.profile && userData.profile.profile_picture) {
+                    img.src = userData.profile.profile_picture;
+                }
+            });
+            
+            // Update bio if applicable
+            document.querySelectorAll(`.user-bio[data-user-id="${userId}"]`).forEach(function(bioEl) {
+                if (userData.profile && userData.profile.bio) {
+                    bioEl.textContent = userData.profile.bio;
+                }
+            });
+            
+            // If this is the current user and we're on profile page
+            if (userId === {{ user.id }} && document.querySelector('#profile-page')) {
+                // Refresh profile section
+                fetch('/profile/?partial=true')
+                    .then(response => response.text())
+                    .then(html => {
+                        document.querySelector('#profile-container').innerHTML = html;
+                    });
+            }
+        }
+        
+        // Show toast for task updates
+        function showUpdateToast(action, taskData) {
+            const statusToast = document.getElementById('statusUpdateToast');
+            const statusToastMessage = document.getElementById('statusUpdateToastMessage');
+            
+            if (!statusToast || !statusToastMessage) return;
+            
+            let message = '';
+            switch(action) {
+                case 'created':
+                    message = `Создана новая задача: "${taskData.title}"`;
+                    break;
+                case 'updated':
+                    message = `Задача обновлена: "${taskData.title}"`;
+                    break;
+                case 'deleted':
+                    message = `Задача удалена`;
+                    break;
+            }
+            
+            statusToastMessage.textContent = message;
+            
+            const toastBootstrap = bootstrap.Toast.getOrCreateInstance(statusToast);
+            toastBootstrap.show();
+        }
+        
+        // Show toast for notifications
+        function showNotificationToast(message) {
+            const statusToast = document.getElementById('statusUpdateToast');
+            const statusToastMessage = document.getElementById('statusUpdateToastMessage');
+            
+            if (!statusToast || !statusToastMessage) return;
+            
+            statusToastMessage.textContent = message;
+            
+            const toastBootstrap = bootstrap.Toast.getOrCreateInstance(statusToast);
+            toastBootstrap.show();
+        }
+        
+        // Helper functions
+        function getStatusLabel(status) {
+            const statusLabels = {
+                'TODO': 'К выполнению',
+                'IN_PROGRESS': 'В процессе',
+                'REVIEW': 'На проверке',
+                'DONE': 'Выполнено'
+            };
+            return statusLabels[status] || status;
+        }
+        
+        function getPriorityLabel(priority) {
+            const priorityLabels = {
+                1: 'Низкий',
+                2: 'Средний',
+                3: 'Высокий',
+                4: 'Срочно'
+            };
+            return priorityLabels[priority] || priority;
+        }
+        
+        function formatDate(date) {
+            return date.toLocaleDateString('ru-RU', { 
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // Initialize task card functionality
+        function initTaskCard(cardElement) {
+            // Add drag-and-drop handlers
+            cardElement.setAttribute('draggable', 'true');
+            cardElement.addEventListener('dragstart', handleDragStart);
+            cardElement.addEventListener('dragend', handleDragEnd);
+            
+            // Add any other event handlers needed
+        }
+        
+        // Function to send a task status change via WebSocket
+        window.updateTaskStatusViaWS = function(taskId, newStatus) {
+            if (taskSocket && taskSocket.readyState === WebSocket.OPEN) {
+                taskSocket.send(JSON.stringify({
+                    type: 'task_status_change',
+                    task_id: taskId,
+                    status: newStatus
+                }));
+                return true;
+            }
+            return false;
+        };
+        
+        // Function to send a new comment via WebSocket
+        window.submitCommentViaWS = function(taskId, commentText) {
+            if (taskSocket && taskSocket.readyState === WebSocket.OPEN) {
+                taskSocket.send(JSON.stringify({
+                    type: 'new_comment',
+                    task_id: taskId,
+                    text: commentText
+                }));
+                return true;
+            }
+            return false;
+        };
+        
+        // Function to mark a notification as read via WebSocket
+        window.markNotificationReadViaWS = function(notificationId) {
+            if (taskSocket && taskSocket.readyState === WebSocket.OPEN) {
+                taskSocket.send(JSON.stringify({
+                    type: 'mark_notification_read',
+                    notification_id: notificationId
+                }));
+                return true;
+            }
+            return false;
+        };
+        
+        // Function to mark all notifications as read via WebSocket
+        window.markAllNotificationsReadViaWS = function() {
+            if (taskSocket && taskSocket.readyState === WebSocket.OPEN) {
+                taskSocket.send(JSON.stringify({
+                    type: 'mark_all_notifications_read'
+                }));
+                return true;
+            }
+            return false;
+        };
+        
+        // Clean up WebSocket connections when navigating away
+        window.addEventListener('beforeunload', function() {
+            if (taskSocket) {
+                taskSocket.close();
+            }
+        });
+        
+        {% endif %}
+    });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

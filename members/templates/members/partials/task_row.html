@@ -1,0 +1,19 @@
+<tr data-task-id="{{ task.id }}">
+    <td><a href="{% url 'task-detail' task.id %}" class="task-title">{{ task.title }}</a></td>
+    <td class="task-status">{{ task.get_status_display }}</td>
+    <td class="task-priority priority-{{ task.priority }}">{{ task.get_priority_display }}</td>
+    <td>{{ task.assigned_to.username }}</td>
+    <td>
+        {% if task.due_date %}
+        {{ task.due_date|date:"d.m.Y" }}
+        {% endif %}
+    </td>
+    <td>
+        <a href="{% url 'task-detail' task.id %}" class="btn btn-sm btn-outline-primary">
+            <i class="fas fa-eye"></i>
+        </a>
+        <a href="{% url 'update-task' task.id %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-edit"></i>
+        </a>
+    </td>
+</tr>

@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Вход{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Вход</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                <strong>Неверное имя пользователя или пароль.</strong> Пожалуйста, попробуйте снова.
+                            </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <label for="id_username" class="form-label">Имя пользователя</label>
+                            <input type="text" name="username" class="form-control {% if form.errors %}is-invalid{% endif %}" id="id_username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_password" class="form-label">Пароль</label>
+                            <input type="password" name="password" class="form-control {% if form.errors %}is-invalid{% endif %}" id="id_password" required>
+                        </div>
+                        <!-- Add hidden next field to redirect after login -->
+                        <input type="hidden" name="next" value="{{ next|default:'/' }}">
+                        <button type="submit" class="btn btn-primary">Войти</button>
+                    </form>
+                    <hr>
+                    <p>Нет аккаунта? <a href="{% url 'register' %}">Зарегистрируйтесь здесь</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

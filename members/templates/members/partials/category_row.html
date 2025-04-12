@@ -1,0 +1,20 @@
+<tr data-category-id="{{ category.id }}" class="category-row">
+    <td class="category-name">{{ category.name }}</td>
+    <td class="category-description">{{ category.description|truncatechars:50 }}</td>
+    <td>
+        <span class="badge category-color" style="background-color: {{ category.color }}">
+            {{ category.color }}
+        </span>
+    </td>
+    <td>{{ category.created_by.username|default:"Система" }}</td>
+    <td>
+        <a href="{% url 'category-update' category.id %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-edit"></i>
+        </a>
+        {% if request.user.is_superuser or request.user == category.created_by %}
+        <a href="{% url 'category-delete' category.id %}" class="btn btn-sm btn-outline-danger">
+            <i class="fas fa-trash"></i>
+        </a>
+        {% endif %}
+    </td>
+</tr>

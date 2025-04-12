@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if form.instance.id %}Редактировать Категорию{% else %}Добавить Категорию{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        {% if form.instance.id %}Редактировать Категорию{% else %}Добавить Новую Категорию{% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">Название Категории</label>
+                            {% if form.name.errors %}
+                                <div class="alert alert-danger">{{ form.name.errors }}</div>
+                            {% endif %}
+                            <input type="text" name="{{ form.name.name }}" 
+                                   id="{{ form.name.id_for_label }}" 
+                                   class="form-control {% if form.name.errors %}is-invalid{% endif %}" 
+                                   value="{{ form.name.value|default:'' }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">Описание</label>
+                            {% if form.description.errors %}
+                                <div class="alert alert-danger">{{ form.description.errors }}</div>
+                            {% endif %}
+                            <textarea name="{{ form.description.name }}" 
+                                      id="{{ form.description.id_for_label }}" 
+                                      class="form-control {% if form.description.errors %}is-invalid{% endif %}" 
+                                      rows="3">{{ form.description.value|default:'' }}</textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.color.id_for_label }}" class="form-label">Цвет</label>
+                            {% if form.color.errors %}
+                                <div class="alert alert-danger">{{ form.color.errors }}</div>
+                            {% endif %}
+                            <div class="input-group">
+                                <input type="color" name="{{ form.color.name }}" 
+                                       id="{{ form.color.id_for_label }}" 
+                                       class="form-control form-control-color {% if form.color.errors %}is-invalid{% endif %}" 
+                                       value="{{ form.color.value|default:'#0275d8' }}">
+                                <span class="input-group-text" id="colorHexValue">{{ form.color.value|default:'#0275d8' }}</span>
+                            </div>
+                            <div class="form-text">Выберите цвет для категории</div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'category-list' %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if form.instance.id %}Обновить Категорию{% else %}Создать Категорию{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const colorPicker = document.getElementById('{{ form.color.id_for_label }}');
+        const colorHexValue = document.getElementById('colorHexValue');
+        
+        // Update hex value display when color changes
+        colorPicker.addEventListener('input', function() {
+            colorHexValue.textContent = this.value;
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

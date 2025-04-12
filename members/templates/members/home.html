@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Менеджер Задач - Главная{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-6">
+            <h1 class="display-4">Добро пожаловать в Менеджер Задач</h1>
+            <p class="lead">Организуйте свои задачи эффективно и повысьте свою продуктивность.</p>
+            <hr class="my-4">
+            <p>Простая, но мощная система управления задачами, которая поможет вам отслеживать свой прогресс.</p>
+            {% if not user.is_authenticated %}
+            <div class="mt-4">
+                <a href="{% url 'register' %}" class="btn btn-primary me-2">Регистрация</a>
+                <a href="{% url 'login' %}" class="btn btn-outline-secondary">Вход</a>
+            </div>
+            {% else %}
+            <div class="mt-4">
+                <a href="{% url 'dashboard' %}" class="btn btn-primary">Перейти в Панель Управления</a>
+            </div>
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <div class="bg-light p-4 rounded shadow text-center">
+                <i class="fas fa-tasks fa-5x mb-3 text-primary"></i>
+                <h4>Управление Задачами Стало Проще</h4>
+                <p class="text-muted">Отслеживайте, организуйте и эффективно выполняйте свои задачи</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Организация Задач</h5>
+                    <p class="card-text">Создавайте, отслеживайте и организуйте задачи с приоритетами и сроками.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Командное Сотрудничество</h5>
+                    <p class="card-text">Назначайте задачи членам команды и отслеживайте их прогресс.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Отслеживание Прогресса</h5>
+                    <p class="card-text">Контролируйте статус ваших задач и отслеживайте свою продуктивность.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

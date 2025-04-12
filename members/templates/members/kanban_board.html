@@ -1,0 +1,769 @@
+{% extends 'base.html' %}
+
+{% block title %}Канбан-доска{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kanban-board {
+        display: flex;
+        gap: 20px;
+        overflow-x: auto;
+        padding-bottom: 15px;
+    }
+    
+    .kanban-column {
+        min-width: 300px;
+        background-color: #f8f9fa;
+        border-radius: 6px;
+        flex: 1;
+    }
+    
+    .kanban-column-header {
+        padding: 10px 15px;
+        border-radius: 6px 6px 0 0;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .todo-header { background-color: #6c757d; }
+    .in-progress-header { background-color: #0d6efd; }
+    .review-header { background-color: #fd7e14; }
+    .done-header { background-color: #198754; }
+    
+    .kanban-column-body {
+        padding: 15px;
+        min-height: 400px;
+    }
+    
+    .task-card {
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        padding: 10px;
+        margin-bottom: 10px;
+        cursor: grab;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .task-card:hover {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .task-card.dragging {
+        opacity: 0.7;
+        transform: scale(0.95);
+    }
+    
+    .task-card-title {
+        font-weight: 500;
+        margin-bottom: 8px;
+    }
+    
+    .task-card-priority {
+        font-size: 0.8rem;
+    }
+    
+    .task-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        font-size: 0.85rem;
+    }
+    
+    .empty-column-message {
+        color: #6c757d;
+        text-align: center;
+        padding: 20px 0;
+        font-style: italic;
+    }
+    
+    .kanban-column.drop-active {
+        background-color: #e9ecef;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Канбан-доска</h1>
+        <div>
+            <a href="{% url 'task-create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Новая Задача
+            </a>
+            <a href="{% url 'task-list' %}" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-list"></i> Список Задач
+            </a>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Фильтры</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="category" class="form-label">Категория</label>
+                    <select name="category" id="category" class="form-select category-select">
+                        <option value="">Все Категории</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:"i" %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="assigned_to" class="form-label">Исполнитель</label>
+                    <select name="assigned_to" id="assigned_to" class="form-select">
+                        <option value="">Все Исполнители</option>
+                        <option value="{{ request.user.id }}" {% if request.GET.assigned_to == request.user.id|stringformat:"i" %}selected{% endif %}>
+                            Мои Задачи
+                        </option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if request.GET.assigned_to == user.id|stringformat:"i" %}selected{% endif %}>
+                            {{ user.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Применить фильтры</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="kanban-board task-container">
+        <!-- TODO Column -->
+        <div class="kanban-column" data-status="TODO">
+            <div class="kanban-column-header todo-header">
+                К выполнению <span class="badge bg-light text-dark ms-1 task-count" data-status="TODO">{{ todo_tasks|length }}</span>
+            </div>
+            <div class="kanban-column-body task-list" id="todo-column">
+                {% if todo_tasks %}
+                    {% for task in todo_tasks %}
+                        <div class="task-card" draggable="true" data-task-id="{{ task.id }}" data-status="TODO">
+                            <div class="task-card-title task-title">{{ task.title }}</div>
+                            <div class="task-card-priority task-priority priority-{{ task.priority }}">
+                                {% if task.priority == 4 %}
+                                <span class="badge bg-danger">Срочно</span>
+                                {% elif task.priority == 3 %}
+                                <span class="badge bg-warning">Высокий</span>
+                                {% elif task.priority == 2 %}
+                                <span class="badge bg-info">Средний</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Низкий</span>
+                                {% endif %}
+                                
+                                {% if task.category %}
+                                <span class="badge category-badge" data-category-id="{{ task.category.id }}" style="background-color: {{ task.category.color }}">
+                                    {{ task.category.name }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="task-card-footer">
+                                <div>
+                                    <i class="fas fa-user-circle"></i> <span class="assigned-to">{{ task.assigned_to.username }}</span>
+                                </div>
+                                <a href="{% url 'task-detail' task.id %}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-column-message">Нет задач</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- IN_PROGRESS Column -->
+        <div class="kanban-column" data-status="IN_PROGRESS">
+            <div class="kanban-column-header in-progress-header">
+                В процессе <span class="badge bg-light text-dark ms-1 task-count" data-status="IN_PROGRESS">{{ in_progress_tasks|length }}</span>
+            </div>
+            <div class="kanban-column-body task-list" id="in-progress-column">
+                {% if in_progress_tasks %}
+                    {% for task in in_progress_tasks %}
+                        <div class="task-card" draggable="true" data-task-id="{{ task.id }}" data-status="IN_PROGRESS">
+                            <div class="task-card-title task-title">{{ task.title }}</div>
+                            <div class="task-card-priority task-priority priority-{{ task.priority }}">
+                                {% if task.priority == 4 %}
+                                <span class="badge bg-danger">Срочно</span>
+                                {% elif task.priority == 3 %}
+                                <span class="badge bg-warning">Высокий</span>
+                                {% elif task.priority == 2 %}
+                                <span class="badge bg-info">Средний</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Низкий</span>
+                                {% endif %}
+                                
+                                {% if task.category %}
+                                <span class="badge category-badge" data-category-id="{{ task.category.id }}" style="background-color: {{ task.category.color }}">
+                                    {{ task.category.name }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="task-card-footer">
+                                <div>
+                                    <i class="fas fa-user-circle"></i> <span class="assigned-to">{{ task.assigned_to.username }}</span>
+                                </div>
+                                <a href="{% url 'task-detail' task.id %}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-column-message">Нет задач</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- REVIEW Column -->
+        <div class="kanban-column" data-status="REVIEW">
+            <div class="kanban-column-header review-header">
+                На проверке <span class="badge bg-light text-dark ms-1 task-count" data-status="REVIEW">{{ review_tasks|length }}</span>
+            </div>
+            <div class="kanban-column-body task-list" id="review-column">
+                {% if review_tasks %}
+                    {% for task in review_tasks %}
+                        <div class="task-card" draggable="true" data-task-id="{{ task.id }}" data-status="REVIEW">
+                            <div class="task-card-title task-title">{{ task.title }}</div>
+                            <div class="task-card-priority task-priority priority-{{ task.priority }}">
+                                {% if task.priority == 4 %}
+                                <span class="badge bg-danger">Срочно</span>
+                                {% elif task.priority == 3 %}
+                                <span class="badge bg-warning">Высокий</span>
+                                {% elif task.priority == 2 %}
+                                <span class="badge bg-info">Средний</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Низкий</span>
+                                {% endif %}
+                                
+                                {% if task.category %}
+                                <span class="badge category-badge" data-category-id="{{ task.category.id }}" style="background-color: {{ task.category.color }}">
+                                    {{ task.category.name }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="task-card-footer">
+                                <div>
+                                    <i class="fas fa-user-circle"></i> <span class="assigned-to">{{ task.assigned_to.username }}</span>
+                                </div>
+                                <a href="{% url 'task-detail' task.id %}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-column-message">Нет задач</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- DONE Column -->
+        <div class="kanban-column" data-status="DONE">
+            <div class="kanban-column-header done-header">
+                Выполнено <span class="badge bg-light text-dark ms-1 task-count" data-status="DONE">{{ done_tasks|length }}</span>
+            </div>
+            <div class="kanban-column-body task-list" id="done-column">
+                {% if done_tasks %}
+                    {% for task in done_tasks %}
+                        <div class="task-card" draggable="true" data-task-id="{{ task.id }}" data-status="DONE">
+                            <div class="task-card-title task-title">{{ task.title }}</div>
+                            <div class="task-card-priority task-priority priority-{{ task.priority }}">
+                                {% if task.priority == 4 %}
+                                <span class="badge bg-danger">Срочно</span>
+                                {% elif task.priority == 3 %}
+                                <span class="badge bg-warning">Высокий</span>
+                                {% elif task.priority == 2 %}
+                                <span class="badge bg-info">Средний</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Низкий</span>
+                                {% endif %}
+                                
+                                {% if task.category %}
+                                <span class="badge category-badge" data-category-id="{{ task.category.id }}" style="background-color: {{ task.category.color }}">
+                                    {{ task.category.name }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="task-card-footer">
+                                <div>
+                                    <i class="fas fa-user-circle"></i> <span class="assigned-to">{{ task.assigned_to.username }}</span>
+                                </div>
+                                <a href="{% url 'task-detail' task.id %}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-column-message">Нет задач</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Status Update Modal -->
+<div class="modal fade" id="statusUpdateModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Обновление статуса задачи</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Обновить статус задачи <strong id="modal-task-title"></strong> на <strong id="modal-task-status"></strong>?</p>
+                <div id="modal-error-message" class="alert alert-danger d-none" role="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="confirmStatusUpdate">Обновить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const csrfToken = '{{ csrf_token }}';
+        let draggedTask = null;
+        let originalColumn = null;
+        const statusModal = new bootstrap.Modal(document.getElementById('statusUpdateModal'));
+        
+        // Add drag and drop event listeners to all task cards
+        initializeTaskCards();
+        
+        // Add event listeners to all kanban columns
+        document.querySelectorAll('.kanban-column').forEach(column => {
+            column.addEventListener('dragover', handleDragOver);
+            column.addEventListener('dragenter', handleDragEnter);
+            column.addEventListener('dragleave', handleDragLeave);
+            column.addEventListener('drop', handleDrop);
+        });
+        
+        // Modal confirm button
+        document.getElementById('confirmStatusUpdate').addEventListener('click', confirmStatusUpdate);
+        
+        // Initialize handlers for all task cards
+        function initializeTaskCards() {
+            document.querySelectorAll('.task-card').forEach(taskCard => {
+                taskCard.addEventListener('dragstart', handleDragStart);
+                taskCard.addEventListener('dragend', handleDragEnd);
+            });
+        }
+        
+        function handleDragStart(e) {
+            draggedTask = this;
+            originalColumn = this.parentNode;
+            
+            // Add dragging class for visual feedback
+            setTimeout(() => {
+                this.classList.add('dragging');
+            }, 0);
+            
+            // Set data for drag operation
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.dataset.taskId);
+        }
+        
+        function handleDragEnd() {
+            this.classList.remove('dragging');
+            
+            // Remove drop-active class from all columns
+            document.querySelectorAll('.kanban-column').forEach(column => {
+                column.classList.remove('drop-active');
+            });
+        }
+        
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault(); // Necessary to allow dropping
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+        
+        function handleDragEnter(e) {
+            this.classList.add('drop-active');
+        }
+        
+        function handleDragLeave(e) {
+            this.classList.remove('drop-active');
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            
+            // Remove drop-active class
+            this.classList.remove('drop-active');
+            
+            // Get the task ID and new status
+            const taskId = e.dataTransfer.getData('text/plain');
+            const newStatus = this.dataset.status;
+            const taskCard = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            
+            if (!taskCard) return;
+            
+            const oldStatus = taskCard.dataset.status;
+            
+            // Don't do anything if dropping in the same column
+            if (oldStatus === newStatus) {
+                return;
+            }
+            
+            // Show confirmation modal
+            const taskTitle = taskCard.querySelector('.task-title').textContent;
+            let statusText = '';
+            switch(newStatus) {
+                case 'TODO': statusText = 'К выполнению'; break;
+                case 'IN_PROGRESS': statusText = 'В процессе'; break;
+                case 'REVIEW': statusText = 'На проверке'; break;
+                case 'DONE': statusText = 'Выполнено'; break;
+            }
+            
+            document.getElementById('modal-task-title').textContent = taskTitle;
+            document.getElementById('modal-task-status').textContent = statusText;
+            document.getElementById('modal-error-message').classList.add('d-none');
+            
+            // Store task info for confirmation handler
+            document.getElementById('confirmStatusUpdate').dataset.taskId = taskId;
+            document.getElementById('confirmStatusUpdate').dataset.newStatus = newStatus;
+            document.getElementById('confirmStatusUpdate').dataset.oldStatus = oldStatus;
+            
+            statusModal.show();
+        }
+        
+        function confirmStatusUpdate() {
+            const button = document.getElementById('confirmStatusUpdate');
+            const taskId = button.dataset.taskId;
+            const newStatus = button.dataset.newStatus;
+            const oldStatus = button.dataset.oldStatus;
+            
+            // First try to update via WebSocket
+            if (window.updateTaskStatusViaWS && window.updateTaskStatusViaWS(taskId, newStatus)) {
+                // Close modal - the UI will be updated via WebSocket response
+                statusModal.hide();
+                return;
+            }
+            
+            // Fallback to traditional AJAX if WebSocket fails
+            fetch(`/tasks/${taskId}/update-status/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ status: newStatus })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to update task status');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Close the modal
+                statusModal.hide();
+                
+                // Move the task card to the new column
+                const taskCard = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                if (!taskCard) return;
+                
+                taskCard.dataset.status = newStatus;
+                
+                const targetColumn = document.querySelector(`.kanban-column[data-status="${newStatus}"] .kanban-column-body`);
+                targetColumn.appendChild(taskCard);
+                
+                // Remove "no tasks" message if it exists
+                const emptyMessage = targetColumn.querySelector('.empty-column-message');
+                if (emptyMessage) {
+                    emptyMessage.remove();
+                }
+                
+                // Add "no tasks" message to original column if it's now empty
+                const originalColumn = document.querySelector(`.kanban-column[data-status="${oldStatus}"] .kanban-column-body`);
+                if (originalColumn && originalColumn.querySelectorAll('.task-card').length === 0) {
+                    originalColumn.innerHTML = '<div class="empty-column-message">Нет задач</div>';
+                }
+                
+                // Update task count badges
+                updateColumnCounts();
+            })
+            .catch(error => {
+                document.getElementById('modal-error-message').textContent = error.message;
+                document.getElementById('modal-error-message').classList.remove('d-none');
+            });
+        }
+        
+        // Listen for WebSocket task updates
+        document.addEventListener('taskUpdate', function(e) {
+            const taskData = e.detail;
+            handleTaskWebSocketUpdate(taskData);
+        });
+        
+        // Handle WebSocket task updates specific to kanban board
+        function handleTaskWebSocketUpdate(data) {
+            if (!data || !data.task_id) return;
+            
+            const taskId = data.task_id;
+            const action = data.action;
+            const taskData = data.task_data;
+            
+            if (action === 'created') {
+                // Add new task to appropriate column
+                addTaskToKanban(taskData);
+            } else if (action === 'updated') {
+                // Update existing task
+                updateTaskInKanban(taskData);
+            } else if (action === 'deleted') {
+                // Remove task
+                removeTaskFromKanban(taskId);
+            }
+            
+            // Update column counts
+            updateColumnCounts();
+        }
+        
+        // Add a new task to the kanban board
+        function addTaskToKanban(taskData) {
+            // Only proceed if we should show this task (based on filters)
+            if (shouldShowTask(taskData)) {
+                const column = document.querySelector(`.kanban-column[data-status="${taskData.status}"] .kanban-column-body`);
+                if (!column) return;
+                
+                // Check if task already exists
+                if (document.querySelector(`.task-card[data-task-id="${taskData.id}"]`)) {
+                    return;
+                }
+                
+                // Remove "no tasks" message if it exists
+                const emptyMessage = column.querySelector('.empty-column-message');
+                if (emptyMessage) {
+                    emptyMessage.remove();
+                }
+                
+                // Create new task card
+                const taskCard = createTaskCard(taskData);
+                column.prepend(taskCard);
+                
+                // Initialize drag and drop for the new card
+                taskCard.addEventListener('dragstart', handleDragStart);
+                taskCard.addEventListener('dragend', handleDragEnd);
+            }
+        }
+        
+        // Create HTML for a task card
+        function createTaskCard(taskData) {
+            const card = document.createElement('div');
+            card.className = 'task-card';
+            card.draggable = true;
+            card.dataset.taskId = taskData.id;
+            card.dataset.status = taskData.status;
+            
+            // Create priority badge
+            let priorityBadge = '';
+            if (taskData.priority === 4) {
+                priorityBadge = '<span class="badge bg-danger">Срочно</span>';
+            } else if (taskData.priority === 3) {
+                priorityBadge = '<span class="badge bg-warning">Высокий</span>';
+            } else if (taskData.priority === 2) {
+                priorityBadge = '<span class="badge bg-info">Средний</span>';
+            } else {
+                priorityBadge = '<span class="badge bg-secondary">Низкий</span>';
+            }
+            
+            // Create category badge if category exists
+            let categoryBadge = '';
+            if (taskData.category) {
+                categoryBadge = `
+                    <span class="badge category-badge" data-category-id="${taskData.category.id}" 
+                          style="background-color: ${taskData.category.color}">
+                        ${taskData.category.name}
+                    </span>
+                `;
+            }
+            
+            // Create the card content
+            card.innerHTML = `
+                <div class="task-card-title task-title">${taskData.title}</div>
+                <div class="task-card-priority task-priority priority-${taskData.priority}">
+                    ${priorityBadge}
+                    ${categoryBadge}
+                </div>
+                <div class="task-card-footer">
+                    <div>
+                        <i class="fas fa-user-circle"></i> 
+                        <span class="assigned-to">${taskData.assigned_to ? taskData.assigned_to.username : 'Не назначено'}</span>
+                    </div>
+                    <a href="/tasks/${taskData.id}/" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        // Update an existing task in the kanban board
+        function updateTaskInKanban(taskData) {
+            const taskCard = document.querySelector(`.task-card[data-task-id="${taskData.id}"]`);
+            
+            // If task doesn't exist in the DOM and should be shown, add it
+            if (!taskCard) {
+                if (shouldShowTask(taskData)) {
+                    addTaskToKanban(taskData);
+                }
+                return;
+            }
+            
+            // If task exists but shouldn't be shown anymore due to filters, remove it
+            if (!shouldShowTask(taskData)) {
+                removeTaskFromKanban(taskData.id);
+                return;
+            }
+            
+            // Update the card content
+            const titleElement = taskCard.querySelector('.task-title');
+            if (titleElement) {
+                titleElement.textContent = taskData.title;
+            }
+            
+            // Update the priority
+            const priorityElement = taskCard.querySelector('.task-priority');
+            if (priorityElement) {
+                let priorityBadge = '';
+                if (taskData.priority === 4) {
+                    priorityBadge = '<span class="badge bg-danger">Срочно</span>';
+                } else if (taskData.priority === 3) {
+                    priorityBadge = '<span class="badge bg-warning">Высокий</span>';
+                } else if (taskData.priority === 2) {
+                    priorityBadge = '<span class="badge bg-info">Средний</span>';
+                } else {
+                    priorityBadge = '<span class="badge bg-secondary">Низкий</span>';
+                }
+                
+                // Update category badge if it exists
+                let categoryBadge = '';
+                if (taskData.category) {
+                    categoryBadge = `
+                        <span class="badge category-badge" data-category-id="${taskData.category.id}" 
+                              style="background-color: ${taskData.category.color}">
+                            ${taskData.category.name}
+                        </span>
+                    `;
+                }
+                
+                priorityElement.innerHTML = priorityBadge + categoryBadge;
+                priorityElement.className = `task-card-priority task-priority priority-${taskData.priority}`;
+            }
+            
+            // Update assigned user
+            const assignedElement = taskCard.querySelector('.assigned-to');
+            if (assignedElement) {
+                assignedElement.textContent = taskData.assigned_to ? taskData.assigned_to.username : 'Не назначено';
+            }
+            
+            // If status has changed, move the card to the correct column
+            if (taskCard.dataset.status !== taskData.status) {
+                const currentColumn = taskCard.closest('.kanban-column-body');
+                const targetColumn = document.querySelector(`.kanban-column[data-status="${taskData.status}"] .kanban-column-body`);
+                
+                if (targetColumn) {
+                    // Remove "no tasks" message from target column if it exists
+                    const emptyMessage = targetColumn.querySelector('.empty-column-message');
+                    if (emptyMessage) {
+                        emptyMessage.remove();
+                    }
+                    
+                    // Move the card
+                    taskCard.dataset.status = taskData.status;
+                    targetColumn.appendChild(taskCard);
+                    
+                    // Add "no tasks" message to original column if it's now empty
+                    if (currentColumn && currentColumn.querySelectorAll('.task-card').length === 0) {
+                        currentColumn.innerHTML = '<div class="empty-column-message">Нет задач</div>';
+                    }
+                }
+            }
+        }
+        
+        // Remove a task from the kanban board
+        function removeTaskFromKanban(taskId) {
+            const taskCard = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (!taskCard) return;
+            
+            const column = taskCard.closest('.kanban-column-body');
+            taskCard.remove();
+            
+            // Add "no tasks" message if column is now empty
+            if (column && column.querySelectorAll('.task-card').length === 0) {
+                column.innerHTML = '<div class="empty-column-message">Нет задач</div>';
+            }
+        }
+        
+        // Check if a task should be shown based on current filters
+        function shouldShowTask(taskData) {
+            const categoryFilter = document.getElementById('category').value;
+            const assignedToFilter = document.getElementById('assigned_to').value;
+            
+            // Check category filter
+            if (categoryFilter && (!taskData.category || taskData.category.id != categoryFilter)) {
+                return false;
+            }
+            
+            // Check assigned_to filter
+            if (assignedToFilter && (!taskData.assigned_to || taskData.assigned_to.id != assignedToFilter)) {
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // Function to update the task count in each column
+        function updateColumnCounts() {
+            const columns = ['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE'];
+            
+            columns.forEach(status => {
+                const column = document.querySelector(`.kanban-column[data-status="${status}"]`);
+                if (!column) return;
+                
+                const countBadge = column.querySelector('.task-count');
+                if (!countBadge) return;
+                
+                const taskCount = column.querySelectorAll('.task-card').length;
+                countBadge.textContent = taskCount;
+            });
+        }
+        
+        // Create custom event listener for websocket task updates
+        if (window.taskSocket) {
+            const originalOnMessage = window.taskSocket.onmessage;
+            window.taskSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                
+                // If this is a task update, dispatch a custom event
+                if (data.type === 'task_update') {
+                    const event = new CustomEvent('taskUpdate', { detail: data });
+                    document.dispatchEvent(event);
+                }
+                
+                // Call the original handler
+                if (originalOnMessage) {
+                    originalOnMessage.call(this, e);
+                }
+            };
+        }
+    });
+</script>
+{% endblock %}

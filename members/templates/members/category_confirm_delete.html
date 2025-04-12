@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Удалить Категорию{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">Удалить Категорию</h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">Вы уверены, что хотите удалить категорию <strong>"{{ object.name }}"</strong>?</p>
+                    
+                    {% if object.task_set.exists %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Эта категория назначена для {{ object.task_set.count }} задач{{ object.task_set.count|pluralize:"и,ач" }}.
+                        Удаление приведет к удалению категории из этих задач.
+                    </div>
+                    {% endif %}
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'category-list' %}" class="btn btn-secondary">Отмена</a>
+                            <button type="submit" class="btn btn-danger">Удалить Категорию</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

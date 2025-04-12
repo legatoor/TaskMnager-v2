@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block title %}Категории{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Категории задач</h1>
+        <a href="{% url 'category-create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Новая Категория
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            {% if categories %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Описание</th>
+                                <th>Цвет</th>
+                                <th>Создатель</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="category-list-container">
+                            {% for category in categories %}
+                                <tr data-category-id="{{ category.id }}" class="category-row">
+                                    <td class="category-name">{{ category.name }}</td>
+                                    <td class="category-description">{{ category.description|truncatechars:50 }}</td>
+                                    <td>
+                                        <span class="badge category-color" style="background-color: {{ category.color }}">
+                                            {{ category.color }}
+                                        </span>
+                                    </td>
+                                    <td>{{ category.created_by.username|default:"Система" }}</td>
+                                    <td>
+                                        <a href="{% url 'category-update' category.id %}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        {% if request.user.is_superuser or request.user == category.created_by %}
+                                        <a href="{% url 'category-delete' category.id %}" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> Категории пока не созданы. Создайте первую категорию!
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Listen for category updates 
+        window.addEventListener('category_update', function(e) {
+            handleCategoryUpdate(e.detail);
+        });
+        
+        // Function to handle real-time category updates
+        function handleCategoryUpdate(data) {
+            const categoryId = data.category_id;
+            const action = data.action;
+            const categoryData = data.category_data;
+            
+            if (action === 'created') {
+                // Add new category row
+                addCategoryToList(categoryData);
+            } else if (action === 'updated') {
+                // Update existing category
+                updateCategoryInList(categoryId, categoryData);
+            } else if (action === 'deleted') {
+                // Remove category
+                removeCategoryFromList(categoryId);
+            }
+        }
+        
+        // Add a new category to the list
+        function addCategoryToList(categoryData) {
+            const container = document.getElementById('category-list-container');
+            if (!container) return;
+            
+            // Check if "no categories" alert is shown, and remove it
+            const alertInfo = document.querySelector('.alert-info');
+            if (alertInfo) {
+                alertInfo.remove();
+                
+                // Create table if it doesn't exist
+                if (!document.querySelector('.table')) {
+                    const cardBody = document.querySelector('.card-body');
+                    const tableHTML = `
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Название</th>
+                                        <th>Описание</th>
+                                        <th>Цвет</th>
+                                        <th>Создатель</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="category-list-container"></tbody>
+                            </table>
+                        </div>
+                    `;
+                    cardBody.innerHTML = tableHTML;
+                }
+            }
+            
+            // Create new row
+            const newRow = document.createElement('tr');
+            newRow.className = 'category-row';
+            newRow.dataset.categoryId = categoryData.id;
+            
+            const createdBy = categoryData.created_by ? categoryData.created_by.username : 'Система';
+            
+            newRow.innerHTML = `
+                <td class="category-name">${categoryData.name}</td>
+                <td class="category-description">${categoryData.description ? categoryData.description.substr(0, 50) : ''}</td>
+                <td>
+                    <span class="badge category-color" style="background-color: ${categoryData.color}">
+                        ${categoryData.color}
+                    </span>
+                </td>
+                <td>${createdBy}</td>
+                <td>
+                    <a href="/categories/${categoryData.id}/edit/" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <a href="/categories/${categoryData.id}/delete/" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </td>
+            `;
+            
+            container.appendChild(newRow);
+        }
+        
+        // Update an existing category in the list
+        function updateCategoryInList(categoryId, categoryData) {
+            const row = document.querySelector(`tr[data-category-id="${categoryId}"]`);
+            if (!row) return;
+            
+            row.querySelector('.category-name').textContent = categoryData.name;
+            row.querySelector('.category-description').textContent = 
+                categoryData.description ? categoryData.description.substr(0, 50) : '';
+            
+            const colorBadge = row.querySelector('.category-color');
+            colorBadge.style.backgroundColor = categoryData.color;
+            colorBadge.textContent = categoryData.color;
+        }
+        
+        // Remove a category from the list
+        function removeCategoryFromList(categoryId) {
+            const row = document.querySelector(`tr[data-category-id="${categoryId}"]`);
+            if (row) {
+                row.remove();
+                
+                // If no categories left, show alert
+                const container = document.getElementById('category-list-container');
+                if (container && container.children.length === 0) {
+                    const cardBody = document.querySelector('.card-body');
+                    cardBody.innerHTML = `
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i> Категории пока не созданы. Создайте первую категорию!
+                        </div>
+                    `;
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

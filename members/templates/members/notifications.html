@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Уведомления{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-bell me-2"></i> Уведомления</h1>
+                
+                {% if notifications %}
+                <div>
+                    <button id="markAllReadBtn" class="btn btn-outline-secondary">
+                        <i class="fas fa-check-double me-1"></i> Отметить все как прочитанные
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="card">
+                <div class="card-body">
+                    {% if notifications %}
+                        <div class="list-group" id="notifications-container">
+                            {% for notification in notifications %}
+                                <div class="notification-item list-group-item list-group-item-action {% if not notification.is_read %}bg-light{% endif %}"
+                                     data-notification-id="{{ notification.id }}">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h5 class="mb-1">
+                                            {% if not notification.is_read %}
+                                                <span class="badge bg-primary me-2 badge-new">Новое</span>
+                                            {% endif %}
+                                            {{ notification.task.title }}
+                                        </h5>
+                                        <small class="text-muted">{{ notification.created_at|date:"d.m.Y H:i" }}</small>
+                                    </div>
+                                    <p class="mb-1">{{ notification.message }}</p>
+                                    <div class="d-flex justify-content-between align-items-center mt-2">
+                                        <small class="text-muted">
+                                            Создано пользователем: {{ notification.task.created_by.username }}
+                                        </small>
+                                        <div>
+                                            <a href="{% url 'task-detail' notification.task.id %}" class="btn btn-sm btn-outline-primary me-1">
+                                                <i class="fas fa-eye"></i> Просмотр
+                                            </a>
+                                            {% if not notification.is_read %}
+                                            <button class="btn btn-sm btn-outline-secondary mark-read-btn"
+                                                    data-notification-id="{{ notification.id }}">
+                                                <i class="fas fa-check"></i> Отметить прочитанным
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5" id="no-notifications">
+                            <i class="fas fa-bell-slash fa-4x mb-3 text-muted"></i>
+                            <h3>Нет уведомлений</h3>
+                            <p class="text-muted">У вас пока нет уведомлений. Они появятся, когда задачи, за которыми вы наблюдаете, будут обновлены.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Mark single notification as read
+        document.querySelectorAll('.mark-read-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const notificationId = this.dataset.notificationId;
+                
+                // Try WebSocket first
+                const wasMarked = markNotificationReadViaWS(notificationId);
+                
+                if (!wasMarked) {
+                    // Fall back to regular form submission
+                    fetch(`/notifications/${notificationId}/mark-read/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // Update UI
+                            const notificationItem = document.querySelector(`.notification-item[data-notification-id="${notificationId}"]`);
+                            notificationItem.classList.remove('bg-light');
+                            notificationItem.querySelector('.badge-new').style.display = 'none';
+                            btn.style.display = 'none';
+                        }
+                    });
+                }
+            });
+        });
+        
+        // Mark all as read
+        const markAllBtn = document.getElementById('markAllReadBtn');
+        if (markAllBtn) {
+            markAllBtn.addEventListener('click', function() {
+                // Try WebSocket first
+                const wasMarked = markAllNotificationsReadViaWS();
+                
+                if (!wasMarked) {
+                    // Fall back to regular form submission
+                    fetch('/notifications/mark-all-read/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // Update UI
+                            document.querySelectorAll('.notification-item').forEach(function(item) {
+                                item.classList.remove('bg-light');
+                                const badge = item.querySelector('.badge-new');
+                                if (badge) badge.style.display = 'none';
+                                const readBtn = item.querySelector('.mark-read-btn');
+                                if (readBtn) readBtn.style.display = 'none';
+                            });
+                        }
+                    });
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}
